@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wayfair CG 预警BI看板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#0b1120;color:#cbd5e1;min-height:100vh}
+.top{background:linear-gradient(135deg,#1a1f36,#0f1322);border-bottom:2px solid #1e2a4a;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.top h1{font-size:18px;color:#e2e8f0}.top .info{font-size:11px;color:#5b6e8c}
+.top .info .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;background:#22c55e;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:14px 18px}
+.card{background:#111827;border-radius:8px;padding:13px;border:1px solid #1e293b;position:relative;transition:all .2s}
+.card:hover{border-color:#334155;transform:translateY(-1px)}
+.card .icon{font-size:18px;margin-bottom:4px}.card .val{font-size:22px;font-weight:700}.card .lbl{font-size:10px;color:#5b6e8c;margin-top:2px}
+.card .line{position:absolute;top:0;left:0;width:3px;height:100%;border-radius:3px 0 0 3px}
+.lr{background:#ef4444}.lo{background:#f59e0b}.lg{background:#22c55e}.lb{background:#3b82f6}.lp{background:#8b5cf6}
+.red{color:#f87171}.green{color:#4ade80}.yellow{color:#facc15}
+.panel{margin:0 18px 12px;background:#111827;border-radius:8px;border:1px solid #1e293b;overflow:hidden}
+.ph{padding:10px 14px;background:#0b1120;font-size:12px;font-weight:700;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center}
+.ph .count{font-size:10px;color:#5b6e8c;font-weight:400}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{background:#0b1120;padding:7px 10px;text-align:left;color:#5b6e8c;font-weight:600;border-bottom:1px solid #1e293b;font-size:10px;white-space:nowrap}
+td{padding:6px 10px;border-bottom:1px solid #111827;white-space:nowrap}
+tr:hover{background:rgba(59,130,246,0.04)}
+.badge{padding:2px 7px;border-radius:9px;font-size:9px;font-weight:700}
+.br{background:rgba(239,68,68,.15);color:#f87171}.bo{background:rgba(245,158,11,.15);color:#fbbf24}
+.by{background:rgba(234,179,8,.15);color:#facc15}.bg{background:rgba(34,197,94,.15);color:#4ade80}
+.bb{background:rgba(59,130,246,.15);color:#60a5fa}.bgg{background:rgba(100,116,139,.15);color:#94a3b8}
+.pbar{height:4px;background:#1e293b;border-radius:2px;overflow:hidden;min-width:50px}
+.pbar-fill{height:100%;border-radius:2px;transition:width .5s}
+.foot{text-align:center;padding:10px;font-size:9px;color:#334155;border-top:1px solid #1e293b;margin:0 18px 16px}
+.tabs{display:flex;gap:4px;margin:12px 18px 0}
+.tab{padding:7px 16px;border-radius:6px 6px 0 0;font-size:12px;cursor:pointer;transition:.2s;background:#111827;color:#5b6e8c;border:1px solid #1e293b;border-bottom:none}
+.tab.active{background:#1e293b;color:#e2e8f0;font-weight:600}
+@media(max-width:768px){.grid{grid-template-columns:repeat(2,1fr)}.panel{margin:0 8px 8px}td,th{padding:4px 6px;font-size:10px}}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>📊 Wayfair CG 预警BI看板</h1>
+  <div class="info"><span class="dot"></span> 飞书数据源 | 30秒自动刷新 | <span id="clock">--</span></div>
+</div>
+
+<div class="grid">
+  <div class="card"><div class="line lb"></div><div class="icon">📦</div><div class="val" id="v0">-</div><div class="lbl">在售SKU数</div></div>
+  <div class="card"><div class="line lr"></div><div class="icon">🚨</div><div class="val red" id="v1">-</div><div class="lbl">异常预警</div></div>
+  <div class="card"><div class="line lg"></div><div class="icon">✅</div><div class="val green" id="v2">-</div><div class="lbl">库存对平</div></div>
+  <div class="card"><div class="line lp"></div><div class="icon">📋</div><div class="val" id="v3">-</div><div class="lbl">未开售SKU</div></div>
+  <div class="card"><div class="line lo"></div><div class="icon">📥</div><div class="val" id="v4">-</div><div class="lbl">累计入库</div></div>
+  <div class="card"><div class="line lb"></div><div class="icon">📤</div><div class="val" id="v5">-</div><div class="lbl">累计出库</div></div>
+  <div class="card"><div class="line lo"></div><div class="icon">🔴</div><div class="val red" id="v6">-</div><div class="lbl">红色立即</div></div>
+  <div class="card"><div class="line lg"></div><div class="icon">🟠</div><div class="val yellow" id="v7">-</div><div class="lbl">橙色关注</div></div>
+</div>
+
+<!-- 分类Tab -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('selling')">📋 在售SKU核对</div>
+  <div class="tab" onclick="switchTab('nonselling')">🔵 未开售跟踪</div>
+  <div class="tab" onclick="switchTab('issues')">⚠️ 异常明细</div>
+</div>
+
+<div class="panel" id="pan_selling">
+  <div class="ph"><span>📋 在售SKU库存核对 — 五步核对法</span><span class="count" id="t1c"></span></div>
+  <div style="overflow-x:auto"><table><thead><tr>
+    <th>SKU</th><th>MPLID</th><th>计划入库</th><th>已接收</th><th>CG出库</th>
+    <th>当前CG</th><th>理论CG</th><th>CG差异</th><th>入仓差异</th>
+    <th>DS可售</th><th>总可售</th><th>基准差</th><th>差异率</th><th>状态</th>
+  </tr></thead><tbody id="t1"></tbody></table></div>
+</div>
+
+<div class="panel" id="pan_nonselling" style="display:none">
+  <div class="ph"><span>🔵 未开售SKU入库进度</span><span class="count" id="t2c"></span></div>
+  <div style="overflow-x:auto"><table><thead><tr>
+    <th>SKU</th><th>MPLID</th><th>计划入库</th><th>已接收</th><th>在途</th>
+    <th>入库进度</th><th>入库单号</th><th>FFO</th><th>订单状态</th><th>目的仓</th>
+  </tr></thead><tbody id="t2"></tbody></table></div>
+</div>
+
+<div class="panel" id="pan_issues" style="display:none">
+  <div class="ph"><span>⚠️ 异常预警明细</span><span class="count red" id="t3c"></span></div>
+  <div style="overflow-x:auto"><table><thead><tr>
+    <th>等级</th><th>SKU</th><th>MPLID</th><th>差异(件)</th><th>差异率</th>
+    <th>入仓差异</th><th>CG差异</th><th>平台差异</th>
+    <th>计划入库</th><th>已接收</th><th>出库</th><th>当前CG</th>
+    <th>触发规则</th><th>操作建议</th>
+  </tr></thead><tbody id="t3"></tbody></table></div>
+</div>
+
+<div class="foot">Wayfair CG-ERP v12 | 数据源: 飞书表格 | 自动刷新:30秒 | 2026-05-22 14:42</div>
+
+<script>
+var DATA={};
+function render(d){
+  DATA=d||{}; var all=DATA.r||[], s=all.filter(function(x){return x.is_selling}),
+  ns=all.filter(function(x){return!x.is_selling}), issues=s.filter(function(x){return x.has_diff});
+  var sev=issues.filter(function(x){return x.warning_level=="SEVERE"}),
+  org=issues.filter(function(x){return x.warning_level=="ORANGE"});
+
+  document.getElementById("clock").textContent=DATA.t||"--";
+  document.getElementById("v0").textContent=s.length;
+  document.getElementById("v1").textContent=issues.length;
+  document.getElementById("v2").textContent=s.length-issues.length;
+  document.getElementById("v3").textContent=ns.length;
+  document.getElementById("v4").textContent=all.reduce(function(t,x){return t+x.cg_received},0);
+  document.getElementById("v5").textContent=all.reduce(function(t,x){return t+x.cg_out},0);
+  document.getElementById("v6").textContent=sev.length;
+  document.getElementById("v7").textContent=org.length;
+
+  var bd={NORMAL:"bg",SEVERE:"br",ORANGE:"bo",YELLOW:"by",NOT_SELLING:"bgg"};
+
+  document.getElementById("t1c").textContent="共 "+s.length+" 个 | 异常 "+issues.length+" | 对平 "+(s.length-issues.length);
+  document.getElementById("t1").innerHTML=s.map(function(r){
+    return "<tr><td><b>"+r.sku+"</b></td><td>"+r.mplid+"</td><td>"+r.cg_planned+"</td><td>"+r.cg_received+"</td><td>"+r.cg_out+"</td><td>"+r.cg_avail+"</td><td>"+r.theoretical_cg+"</td><td class=\""+(r.cg_diff?"red":"green")+"\">"+r.cg_diff+"</td><td class=\""+(r.inbound_diff?"red":"green")+"\">"+r.inbound_diff+"</td><td>"+r.ds_avail+"</td><td>"+r.platform_avail+"</td><td>"+r.base_diff+"</td><td>"+(r.diff_rate*100).toFixed(1)+"%</td><td><span class=\"badge "+(bd[r.warning_level]||"bg")+"\">"+r.warning_name+"</span></td></tr>";
+  }).join("");
+
+  document.getElementById("t2c").textContent="共 "+ns.length+" 个";
+  document.getElementById("t2").innerHTML=ns.map(function(r){
+    var io=r.inbound_orders&&r.inbound_orders[0]?r.inbound_orders[0]:{};
+    var pct=r.cg_planned>0?Math.round(r.cg_received/r.cg_planned*100):0;
+    var intransit=Math.max(0,r.cg_planned-r.cg_received);
+    return "<tr><td><b>"+r.sku+"</b></td><td>"+r.mplid+"</td><td>"+r.cg_planned+"</td><td>"+r.cg_received+"</td><td>"+intransit+"</td><td><div class=\"pbar\"><div class=\"pbar-fill\" style=\"width:"+pct+"%;background:"+(pct>=80?"#22c55e":pct>=50?"#3b82f6":"#facc15")+"\"></div></div> "+pct+"%</td><td>"+(io.inb||"-")+"</td><td>"+(io.ffo||"-")+"</td><td>"+(io.st||"-")+"</td><td>"+(io.dst||"-")+"</td></tr>";
+  }).join("");
+
+  document.getElementById("t3c").textContent="共 "+issues.length+" 条 | 红色 "+sev.length+" | 橙色 "+org.length;
+  document.getElementById("t3").innerHTML=issues.map(function(r){
+    return "<tr><td><span class=\"badge "+(bd[r.warning_level]||"by")+"\">"+r.warning_name+"</span></td><td><b>"+r.sku+"</b></td><td>"+r.mplid+"</td><td class=\"red\">"+r.base_diff+"</td><td>"+(r.diff_rate*100).toFixed(1)+"%</td><td class=\"red\">"+r.inbound_diff+"</td><td class=\"red\">"+r.cg_diff+"</td><td>"+r.platform_diff+"</td><td>"+r.cg_planned+"</td><td>"+r.cg_received+"</td><td>"+r.cg_out+"</td><td>"+r.cg_avail+"</td><td>"+r.rule_name+"</td><td>"+r.ops_action+"</td></tr>";
+  }).join("");
+}
+
+function switchTab(tab){
+  document.querySelectorAll(".tab").forEach(function(el,i){
+    el.classList.toggle("active", (tab==="selling"&&i===0)||(tab==="nonselling"&&i===1)||(tab==="issues"&&i===2));
+  });
+  document.getElementById("pan_selling").style.display = tab==="selling" ? "" : "none";
+  document.getElementById("pan_nonselling").style.display = tab==="nonselling" ? "" : "none";
+  document.getElementById("pan_issues").style.display = tab==="issues" ? "" : "none";
+}
+
+var EMBED = {"t": "2026-05-22 14:42:12", "r": [{"sku": "Aeon-C29026W1-3-4-US", "mplid": "BAVN1002", "is_selling": false, "cg_planned": 30, "cg_shipped": 0, "cg_received": 0, "cg_out": 0, "cg_avail": 0, "ds_avail": 0, "platform_avail": 0, "initial_cg": 0, "theoretical_cg": 0, "inbound_diff": 30, "cg_diff": 0, "platform_diff": 0, "base_diff": 30, "diff_rate": 30.0, "has_diff": true, "warning_level": "NOT_SELLING", "warning_name": "未开售", "rule_name": "非在售-不预警", "should_notify": false, "should_case": false, "should_claim": false, "feishu_action": "", "ops_action": "等待开售", "cg_wh": ["CA - Lathrop"], "inbound_orders": [{"spo": "BRAVAT-20260413-3SKU马桶80个", "inb": "WHS-399454-43093614", "ffo": "FFOZZK4R52", "st": "Open", "dst": "Wayfair Warehouse Lathrop"}]}, {"sku": "Apex-C29025W3-3-US", "mplid": "BAVN1002", "is_selling": false, "cg_planned": 20, "cg_shipped": 0, "cg_received": 0, "cg_out": 0, "cg_avail": 0, "ds_avail": 0, "platform_avail": 0, "initial_cg": 0, "theoretical_cg": 0, "inbound_diff": 20, "cg_diff": 0, "platform_diff": 0, "base_diff": 20, "diff_rate": 20.0, "has_diff": true, "warning_level": "NOT_SELLING", "warning_name": "未开售", "rule_name": "非在售-不预警", "should_notify": false, "should_case": false, "should_claim": false, "feishu_action": "", "ops_action": "等待开售", "cg_wh": ["CA - Lathrop"], "inbound_orders": [{"spo": "BRAVAT-20260413-3SKU马桶80个", "inb": "WHS-399454-43093614", "ffo": "FFOZZK4R52", "st": "Open", "dst": "Wayfair Warehouse Lathrop"}]}, {"sku": "Avant-C29027W1-3-4-US", "mplid": "BAVN1002", "is_selling": false, "cg_planned": 30, "cg_shipped": 0, "cg_received": 0, "cg_out": 0, "cg_avail": 0, "ds_avail": 0, "platform_avail": 0, "initial_cg": 0, "theoretical_cg": 0, "inbound_diff": 30, "cg_diff": 0, "platform_diff": 0, "base_diff": 30, "diff_rate": 30.0, "has_diff": true, "warning_level": "NOT_SELLING", "warning_name": "未开售", "rule_name": "非在售-不预警", "should_notify": false, "should_case": false, "should_claim": false, "feishu_action": "", "ops_action": "等待开售", "cg_wh": ["CA - Lathrop"], "inbound_orders": [{"spo": "BRAVAT-20260413-3SKU马桶80个", "inb": "WHS-399454-43093614", "ffo": "FFOZZK4R52", "st": "Open", "dst": "Wayfair Warehouse Lathrop"}]}, {"sku": "CZ9054W-1-US", "mplid": "BAVN1000", "is_selling": true, "cg_planned": 100, "cg_shipped": 0, "cg_received": 100, "cg_out": 36, "cg_avail": 64, "ds_avail": 1, "platform_avail": 65, "initial_cg": 0, "theoretical_cg": 64, "inbound_diff": 0, "cg_diff": 0, "platform_diff": 0, "base_diff": 0, "diff_rate": 0.0, "has_diff": false, "warning_level": "NORMAL", "warning_name": "正常", "rule_name": "库存对平", "should_notify": false, "should_case": false, "should_claim": false, "feishu_action": "", "ops_action": "对平", "cg_wh": ["CA - Perris Small Parcel", "IL - Romeoville", "CA - Lathrop", "TX - Lancaster", "MD - Aberdeen"], "inbound_orders": [{"spo": 1, "inb": "WHS-399454-42336530", "ffo": "FFO9GH2X47", "st": "Open", "dst": "Wayfair Warehouse Perris2 (SP)"}, {"spo": "BRAVAT-20260413-侧板", "inb": "WHS-399454-43092295", "ffo": "FFO636RBDN", "st": "Completed", "dst": "Wayfair Warehouse Perris2 (SP)"}]}]};
+if(EMBED && EMBED.r) { DATA=EMBED; render(EMBED); }
+
+setInterval(function(){
+  try{fetch("/api/data").then(function(r){return r.json()}).then(function(d){DATA=d;render(d)}).catch(function(){})}catch(e){}
+},30000);
+</script>
+</body>
+</html>
